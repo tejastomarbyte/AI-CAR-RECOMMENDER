@@ -67,8 +67,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,   # must be False when allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -194,6 +194,12 @@ def _fallback_reasoning(prefs: dict, top_cars: list[dict]) -> str:
 @app.get("/")
 def root():
     return {"status": "CarFind AI backend is live", "cars_in_db": len(CARS)}
+
+
+@app.get("/health")
+def health():
+    """Railway health check endpoint."""
+    return {"ok": True}
 
 
 @app.get("/api/meta")

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  getRecommendations, compareCars, addToShortlist,
+  getRecommendations, compareCars, addToShortlist, checkBackendHealth, API_BASE,
   type Preferences, type Car, type RecommendResponse, type CompareResponse,
 } from "@/lib/api";
 
@@ -841,6 +841,12 @@ export default function Home() {
   const [result, setResult] = useState<RecommendResponse | null>(null);
   const [compareData, setCompareData] = useState<CompareResponse | null>(null);
   const [error, setError] = useState("");
+  const [backendOk, setBackendOk] = useState<boolean | null>(null);
+
+  // Check backend connectivity on mount
+  useEffect(() => {
+    checkBackendHealth().then(ok => setBackendOk(ok));
+  }, []);
 
   const handleStart = (name: string) => {
     setNameForLoader(name);
@@ -912,6 +918,22 @@ export default function Home() {
 
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+        {/* Backend health banner */}
+        {backendOk === false && (
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 mb-4 text-sm">
+            <strong>⚠️ Backend unreachable</strong> — Cannot connect to <code className="bg-red-100 px-1 rounded">{API_BASE}</code>.
+            <div className="mt-1 text-xs text-red-600">
+              Check: (1) Railway backend is deployed and running, (2) <code>NEXT_PUBLIC_API_URL</code> in Vercel matches your Railway URL exactly, (3) Redeploy Vercel after setting the env var.
+            </div>
+          </div>
+        )}
+        {backendOk === true && step === "intro" && (
+          <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-2 mb-4 text-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+            Backend connected · {API_BASE}
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 mb-6 text-sm">
             ⚠️ {error}

@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export interface Preferences {
   budget_lakh: number;
@@ -49,47 +49,68 @@ export interface CompareResponse {
   comparison_table: Array<{ field: string; [carId: string]: string }>;
 }
 
+// Shared fetch wrapper with clear error messages
+async function apiFetch(path: string, options?: RequestInit) {
+  const url = `${API_BASE}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
+    });
+  } catch (e) {
+    // Network-level failure: backend unreachable, wrong URL, CORS preflight blocked
+    throw new Error(
+      `Cannot reach backend at ${API_BASE}. ` +
+      `Check that NEXT_PUBLIC_API_URL is set correctly in Vercel environment variables ` +
+      `and that your Railway backend is running. (${String(e)})`
+    );
+  }
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail || JSON.stringify(body);
+    } catch { /* ignore parse errors */ }
+    throw new Error(`Backend error: ${detail}`);
+  }
+
+  return res.json();
+}
+
 export async function getRecommendations(prefs: Preferences): Promise<RecommendResponse> {
-  const res = await fetch(`${API_BASE}/api/recommend`, {
+  return apiFetch("/api/recommend", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(prefs),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Failed to get recommendations");
-  }
-  return res.json();
 }
 
 export async function compareCars(carIds: string[]): Promise<CompareResponse> {
-  const res = await fetch(`${API_BASE}/api/compare`, {
+  return apiFetch("/api/compare", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ car_ids: carIds }),
   });
-  if (!res.ok) throw new Error("Compare failed");
-  return res.json();
 }
 
 export async function addToShortlist(sessionId: string, carId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/shortlist`, {
+  await apiFetch("/api/shortlist", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ session_id: sessionId, car_id: carId }),
   });
 }
 
 export async function getShortlist(sessionId: string): Promise<{ cars: Car[] }> {
-  const res = await fetch(`${API_BASE}/api/shortlist/${sessionId}`);
-  return res.json();
+  return apiFetch(`/api/shortlist/${sessionId}`);
 }
 
-export async function getStats(): Promise<{
-  total_cars: number;
-  sessions_created: number;
-  shortlist_saves: number;
-}> {
-  const res = await fetch(`${API_BASE}/api/stats`);
-  return res.json();
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`, { method: "GET" });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
+
+export { API_BASE };
